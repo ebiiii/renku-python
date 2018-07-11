@@ -29,6 +29,7 @@ from git import InvalidGitRepositoryError
 from git import Repo as GitRepo
 from werkzeug.utils import secure_filename
 
+import renku
 from renku._compat import Path
 
 HAS_LFS = call(['git', 'lfs'], stdout=PIPE, stderr=STDOUT) == 0
@@ -186,16 +187,37 @@ class RepositoryApiMixin(object):
 
         # initialize LFS if it is requested and installed
         if use_external_storage and HAS_LFS:
-            self.init_external_storage(force=force)
+            self.init_external_storage(self.git.description, force=force)
 
         return str(path)
 
-    def init_external_storage(self, force=False):
+    def init_external_storage(self, name, force=False):
         """Initialize the external storage for data."""
         cmd = ['git', 'lfs', 'install', '--local']
         if force:
             cmd.append('--force')
 
+        call(
+            cmd,
+            stdout=PIPE,
+            stderr=STDOUT,
+            cwd=str(self.path.absolute()),
+        )
+
+        from renku.cli._config import read_config
+        global_config = read_config()
+        endpoint = global_config['core']['default']
+
+        if not self.git.config_reader(config_level='repository').has_section('http "{}"'.format(endpoint)):
+            with self.git.config_writer(config_level='repository') as conf:
+                conf['http "{}"'.format(endpoint)] = {'extraheader': "authorization: bearer {}".format(global_config['endpoints'][endpoint]['token']['refresh_token'])}
+
+        uid = str(uuid.uuid4())
+
+        client = renku.APIClient(endpoint)
+        client.create_bucket(uuid=uid, path=uid, lfs_store=uid, backend={}, description=name)
+
+        cmd = ['git', 'config', '-f', '.lfsconfig', 'lfs.url', '{}/api/storage/repo/{}.git/info.lfs'.format(endpoint, uid)]
         call(
             cmd,
             stdout=PIPE,

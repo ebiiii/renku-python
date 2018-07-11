@@ -24,7 +24,7 @@ class BucketsApiMixin(object):
     def storage_info(self):
         """Return information about available bucket backends."""
         resp = self.get(
-            self._url('/api/storage/io/backends'),
+            self._url('/api/storage/backends'),
             headers=self.headers,
         )
         return resp.json()
@@ -32,16 +32,15 @@ class BucketsApiMixin(object):
     def create_bucket(self, **kwargs):
         """Create a new storage bucket."""
         # TODO add validation
-        kwargs['request_type'] = 'create_bucket'
         resp = self.post(
-            self._url('/api/storage/authorize/create_bucket'), json=kwargs
+            self._url('/api/storage/repo'), json=kwargs
         )
-        return resp.json()
+        return resp
 
     def storage_bucket_metadata_replace(self, resource_id, data):
         """Replace resource metadata."""
         return self.put(
-            self._url('/api/storage/bucket/{0}', resource_id),
+            self._url('/api/storage/repo/{0}', resource_id),
             json=data,
             expected_status_code=200,
         ).json()

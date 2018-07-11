@@ -77,6 +77,11 @@ class APIClient(
         self.endpoint = endpoint
         super(APIClient, self).__init__(**kwargs)
 
+        from renku.cli._config import read_config
+        global_config = read_config()
+        endpoint = global_config['core']['default']
+        self.headers.update({'Authorization': 'bearer {}'.format(global_config['endpoints'][endpoint]['token']['refresh_token'])})
+
     @property
     def endpoint(self):
         """Return endpoint value."""
