@@ -17,7 +17,9 @@
 # limitations under the License.
 """Client for handling a local repository."""
 
+import configparser
 import datetime
+import os
 import uuid
 from contextlib import contextmanager
 from subprocess import PIPE, STDOUT, call
@@ -212,18 +214,24 @@ class RepositoryApiMixin(object):
             with self.git.config_writer(config_level='repository') as conf:
                 conf['http "{}"'.format(endpoint)] = {'extraheader': "authorization: bearer {}".format(global_config['endpoints'][endpoint]['token']['refresh_token'])}
 
-        uid = str(uuid.uuid4())
+        config = configparser.ConfigParser()
 
-        client = renku.APIClient(endpoint)
-        client.create_bucket(uuid=uid, path=uid, lfs_store=uid, backend={}, description=name)
+        if os.path.exists('.lfsconfig'):
+            config.read('.lfsconfig')
 
-        cmd = ['git', 'config', '-f', '.lfsconfig', 'lfs.url', '{}/api/storage/repo/{}.git/info.lfs'.format(endpoint, uid)]
-        call(
-            cmd,
-            stdout=PIPE,
-            stderr=STDOUT,
-            cwd=str(self.path.absolute()),
-        )
+        if not config.has_section('lfs') or 'url' not in config['lfs']:
+            uid = str(uuid.uuid4())
+
+            client = renku.APIClient(endpoint)
+            client.create_bucket(uuid=uid, path=uid, lfs_store=uid, backend={}, description=name)
+
+            cmd = ['git', 'config', '-f', '.lfsconfig', 'lfs.url', '{}/api/storage/repo/{}.git/info.lfs'.format(endpoint, uid)]
+            call(
+                cmd,
+                stdout=PIPE,
+                stderr=STDOUT,
+                cwd=str(self.path.absolute()),
+            )
 
     def track_paths_in_storage(self, *paths):
         """Track paths in the external storage."""
